@@ -7,46 +7,50 @@
 
 import React from "react";
 import { StyleSheet, View } from "react-native";
+import { FeatureCollection } from "geojson";
+import data from "./data.json";
+
 import Mapbox from "@rnmapbox/maps";
 
-const features = {
-    type: "FeatureCollection",
-    features: [
-        {
-            type: "Feature",
-            id: "a-feature",
-            properties: {
-                icon: "example",
-                text: "example-icon-and-label",
-            },
-            geometry: {
-                type: "Point",
-                coordinates: [2.548828100070267, 11.716788276964309],
-            },
-        },
-        {
-            type: "Feature",
-            id: "b-feature",
-            properties: {
-                text: "just-label",
-            },
-            geometry: {
-                type: "Point",
-                coordinates: [-1.2634277220050762, 7.199000653649819],
-            },
-        },
-        {
-            type: "Feature",
-            id: "c-feature",
-            properties: {
-                icon: "example",
-            },
-            geometry: {
-                type: "Point",
-                coordinates: [3.617628692102244, 7.505671715388999],
-            },
-        },
-    ],
+Mapbox.setAccessToken("pk.eyJ1Ijoidml2aWRtYWNoaW5lcyIsImEiOiJjbDd0NmNmeXcwMm9hM3dvOTNjN3hlYmtjIn0.O6oE-WFPSEEW7k9w8ZklDg");
+
+const layerStyles: {
+    singlePoint: CircleLayerStyle;
+    clusteredPoints: CircleLayerStyle;
+    clusterCount: SymbolLayerStyle;
+} = {
+    singlePoint: {
+        circleColor: "green",
+        circleOpacity: 0.84,
+        circleStrokeWidth: 2,
+        circleStrokeColor: "white",
+        circleRadius: 5,
+        circlePitchAlignment: "map",
+    },
+
+    clusteredPoints: {
+        circlePitchAlignment: "map",
+
+        circleColor: ["step", ["get", "point_count"], "#51bbd6", 100, "#f1f075", 750, "#f28cb1"],
+
+        circleRadius: ["step", ["get", "point_count"], 20, 100, 30, 750, 40],
+
+        circleOpacity: 0.84,
+        circleStrokeWidth: 2,
+        circleStrokeColor: "white",
+    },
+
+    clusterCount: {
+        textField: [
+            "format",
+            ["concat", ["get", "point_count"], "\n"],
+            {},
+            ["concat", ">1: ", ["+", ["get", "mag2"], ["get", "mag3"], ["get", "mag4"], ["get", "mag5"]]],
+            { "font-scale": 0.8 },
+        ],
+        textSize: 12,
+        textPitchAlignment: "map",
+    },
 };
 
 function App(): JSX.Element {
@@ -71,15 +75,14 @@ const mag4 = ["all", [">=", ["get", "mag"], 4], ["<", ["get", "mag"], 5]];
 const mag5 = [">=", ["get", "mag"], 5];
 
 function Cluster() {
-    const circleLayerStyle = {
-        circleRadiusTransition: { duration: 5000, delay: 0 },
-        circleColor: "#ff0000",
-    };
+    const shapeSource = React.useRef<Mapbox.ShapeSource>(null);
+    const [selectedCluster, setSelectedCluster] = React.useState<FeatureCollection>();
 
     return (
         <Mapbox.ShapeSource
+            ref={shapeSource}
             id={"shape-source-id-0"}
-            shape={features}
+            shape={data}
             cluster={true}
             clusterRadius={50}
             clusterMaxZoomLevel={14}
@@ -105,8 +108,38 @@ function Cluster() {
                     ["case", mag5, 1, 0],
                 ],
             }}
+            onPress={async pressedShape => {
+                if (shapeSource.current) {
+                    try {
+                        const [cluster] = pressedShape.features;
+
+                        const collection = await shapeSource.current.getClusterLeaves(cluster, 999, 0);
+
+                        setSelectedCluster(collection);
+                    } catch {
+                        if (!pressedShape.features[0].properties?.cluster) {
+                            setSelectedCluster({
+                                type: "FeatureCollection",
+                                features: [pressedShape.features[0]],
+                            });
+                        }
+                    }
+                }
+            }}
         >
-            <Mapbox.CircleLayer id={"circle-layer"} style={circleLayerStyle} />
+            <Mapbox.SymbolLayer id="pointCount" style={layerStyles.clusterCount} />
+
+            <Mapbox.CircleLayer
+                id={"clusteredPoints"} //
+                belowLayerID="pointCount"
+                filter={["has", "point_count"]}
+                style={layerStyles.clusteredPoints}
+            />
+            <Mapbox.CircleLayer //
+                id="singlePoint"
+                filter={["!", ["has", "point_count"]]}
+                style={layerStyles.singlePoint}
+            />
         </Mapbox.ShapeSource>
     );
 }
