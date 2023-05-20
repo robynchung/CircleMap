@@ -8,11 +8,10 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { FeatureCollection } from "geojson";
+import _ from "lodash";
 import data from "./data.json";
 
 import Mapbox from "@rnmapbox/maps";
-
-Mapbox.setAccessToken("pk.eyJ1Ijoidml2aWRtYWNoaW5lcyIsImEiOiJjbDd0NmNmeXcwMm9hM3dvOTNjN3hlYmtjIn0.O6oE-WFPSEEW7k9w8ZklDg");
 
 const layerStyles: {
     singlePoint: CircleLayerStyle;
@@ -45,7 +44,7 @@ const layerStyles: {
             "format",
             ["concat", ["get", "point_count"], "\n"],
             {},
-            ["concat", ">1: ", ["+", ["get", "mag2"], ["get", "mag3"], ["get", "mag4"], ["get", "mag5"]]],
+            ["concat", ">1: ", ["+", ["get", "count2"], ["get", "count3"], ["get", "count4"], ["get", "count5"]]],
             { "font-scale": 0.8 },
         ],
         textSize: 12,
@@ -68,44 +67,54 @@ function App(): JSX.Element {
     );
 }
 
-const mag1 = ["<", ["get", "mag"], 2];
-const mag2 = ["all", [">=", ["get", "mag"], 2], ["<", ["get", "mag"], 3]];
-const mag3 = ["all", [">=", ["get", "mag"], 3], ["<", ["get", "mag"], 4]];
-const mag4 = ["all", [">=", ["get", "mag"], 4], ["<", ["get", "mag"], 5]];
-const mag5 = [">=", ["get", "mag"], 5];
+const count1 = ["<", ["get", "predicted_count"], 2];
+const count2 = ["all", [">=", ["get", "predicted_count"], 2], ["<", ["get", "predicted_count"], 3]];
+const count3 = ["all", [">=", ["get", "predicted_count"], 3], ["<", ["get", "predicted_count"], 4]];
+const count4 = ["all", [">=", ["get", "predicted_count"], 4], ["<", ["get", "predicted_count"], 5]];
+const count5 = [">=", ["get", "predicted_count"], 5];
 
 function Cluster() {
     const shapeSource = React.useRef<Mapbox.ShapeSource>(null);
     const [selectedCluster, setSelectedCluster] = React.useState<FeatureCollection>();
 
+    const shape = {
+        ...data,
+        features: _.map(data.features, item => {
+            const obj = { ...item, properties: { ...item.properties, predicted_count: item.properties.mag } };
+            delete obj.properties.mag;
+
+            return obj;
+        }),
+    };
+
     return (
         <Mapbox.ShapeSource
             ref={shapeSource}
             id={"shape-source-id-0"}
-            shape={data}
+            shape={shape}
             cluster={true}
             clusterRadius={50}
             clusterMaxZoomLevel={14}
             clusterProperties={{
-                mag1: [
-                    ["+", ["accumulated"], ["get", "mag1"]],
-                    ["case", mag1, 1, 0],
+                count1: [
+                    ["+", ["accumulated"], ["get", "count1"]],
+                    ["case", count1, 1, 0],
                 ],
-                mag2: [
-                    ["+", ["accumulated"], ["get", "mag2"]],
-                    ["case", mag2, 1, 0],
+                count2: [
+                    ["+", ["accumulated"], ["get", "count2"]],
+                    ["case", count2, 1, 0],
                 ],
-                mag3: [
-                    ["+", ["accumulated"], ["get", "mag3"]],
-                    ["case", mag3, 1, 0],
+                count3: [
+                    ["+", ["accumulated"], ["get", "count3"]],
+                    ["case", count3, 1, 0],
                 ],
-                mag4: [
-                    ["+", ["accumulated"], ["get", "mag4"]],
-                    ["case", mag4, 1, 0],
+                count4: [
+                    ["+", ["accumulated"], ["get", "count4"]],
+                    ["case", count4, 1, 0],
                 ],
-                mag5: [
-                    ["+", ["accumulated"], ["get", "mag5"]],
-                    ["case", mag5, 1, 0],
+                count5: [
+                    ["+", ["accumulated"], ["get", "count5"]],
+                    ["case", count5, 1, 0],
                 ],
             }}
             onPress={async pressedShape => {
@@ -132,7 +141,7 @@ function Cluster() {
             <Mapbox.CircleLayer
                 id={"clusteredPoints"} //
                 belowLayerID="pointCount"
-                filter={["has", "point_count"]}
+                filter={["has", "point_count"]} // defined from mapbox
                 style={layerStyles.clusteredPoints}
             />
             <Mapbox.CircleLayer //
