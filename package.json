@@ -13,7 +13,8 @@
     "@rnmapbox/maps": "^10.0.7-rc.0",
     "lodash": "^4.17.21",
     "react": "18.2.0",
-    "react-native": "0.71.8"
+    "react-native": "0.71.8",
+    "react-native-config": "^1.5.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

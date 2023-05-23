@@ -8,10 +8,13 @@
 import React from "react";
 import { StyleSheet, View } from "react-native";
 import { FeatureCollection } from "geojson";
+import config from "react-native-config";
 import _ from "lodash";
 import data from "./data.json";
 
 import Mapbox from "@rnmapbox/maps";
+
+Mapbox.setAccessToken(config.MAPBOX_PUBLIC_TOKEN);
 
 const layerStyles: {
     singlePoint: CircleLayerStyle;
@@ -29,11 +32,8 @@ const layerStyles: {
 
     clusteredPoints: {
         circlePitchAlignment: "map",
-
         circleColor: ["step", ["get", "point_count"], "#51bbd6", 100, "#f1f075", 750, "#f28cb1"],
-
         circleRadius: ["step", ["get", "point_count"], 20, 100, 30, 750, 40],
-
         circleOpacity: 0.84,
         circleStrokeWidth: 2,
         circleStrokeColor: "white",
@@ -55,6 +55,7 @@ const layerStyles: {
 function App(): JSX.Element {
     return (
         <View style={styles.container}>
+            <Mapbox.Camera centerCoordinate={[-151.5053, 63.0719, 0.0]} />
             <Mapbox.MapView
                 style={styles.map}
                 onPress={props => {
@@ -67,13 +68,13 @@ function App(): JSX.Element {
     );
 }
 
-const count1 = ["<", ["get", "predicted_count"], 2];
-const count2 = ["all", [">=", ["get", "predicted_count"], 2], ["<", ["get", "predicted_count"], 3]];
-const count3 = ["all", [">=", ["get", "predicted_count"], 3], ["<", ["get", "predicted_count"], 4]];
-const count4 = ["all", [">=", ["get", "predicted_count"], 4], ["<", ["get", "predicted_count"], 5]];
-const count5 = [">=", ["get", "predicted_count"], 5];
+const count1 = ["<", ["get", "predicted_count"], 10];
+const count2 = ["all", [">=", ["get", "predicted_count"], 10], ["<", ["get", "predicted_count"], 50]];
+const count3 = ["all", [">=", ["get", "predicted_count"], 50], ["<", ["get", "predicted_count"], 100]];
+const count4 = ["all", [">=", ["get", "predicted_count"], 100], ["<", ["get", "predicted_count"], 200]];
+const count5 = [">=", ["get", "predicted_count"], 200];
 
-function Cluster() {
+function Cluster({}) {
     const shapeSource = React.useRef<Mapbox.ShapeSource>(null);
     const [selectedCluster, setSelectedCluster] = React.useState<FeatureCollection>();
 
@@ -95,6 +96,9 @@ function Cluster() {
             cluster={true}
             clusterRadius={50}
             clusterMaxZoomLevel={14}
+            /**
+             * https://docs.mapbox.com/mapbox-gl-js/style-spec/sources/#geojson-clusterProperties
+             */
             clusterProperties={{
                 count1: [
                     ["+", ["accumulated"], ["get", "count1"]],
@@ -121,7 +125,6 @@ function Cluster() {
                 if (shapeSource.current) {
                     try {
                         const [cluster] = pressedShape.features;
-
                         const collection = await shapeSource.current.getClusterLeaves(cluster, 999, 0);
 
                         setSelectedCluster(collection);
@@ -136,19 +139,16 @@ function Cluster() {
                 }
             }}
         >
+            {/* Mapped */}
             <Mapbox.SymbolLayer id="pointCount" style={layerStyles.clusterCount} />
-
             <Mapbox.CircleLayer
                 id={"clusteredPoints"} //
                 belowLayerID="pointCount"
                 filter={["has", "point_count"]} // defined from mapbox
                 style={layerStyles.clusteredPoints}
             />
-            <Mapbox.CircleLayer //
-                id="singlePoint"
-                filter={["!", ["has", "point_count"]]}
-                style={layerStyles.singlePoint}
-            />
+
+            <Mapbox.CircleLayer id="singlePoint" filter={["!", ["has", "point_count"]]} style={layerStyles.singlePoint} />
         </Mapbox.ShapeSource>
     );
 }
